@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101114">
+<title>Lock-On Camera</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101114'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23F2A93B' stroke-width='6'/%3E%3Ccircle cx='32' cy='32' r='9' fill='%23F4F1EA'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#101114;--panel:#1C1E23;--ink:#F4F1EA;--muted:#A3A8B1;--amber:#F2A93B;--lock:#5CCBA4;--hair:rgba(244,241,234,.18);color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+.boot{min-height:100%;max-width:440px;margin:0 auto;padding:40px 22px 28px;display:flex;flex-direction:column;gap:18px;justify-content:center}
+.boot h1{margin:0;font-size:38px;line-height:1;font-weight:700;letter-spacing:-.01em}
+.boot h1 span{color:var(--amber)}
+.lede{margin:0;font-size:18px;color:var(--ink)}
+.how{margin:0;padding:0 0 0 22px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.go{min-height:58px;padding:12px 20px;border:0;border-radius:16px;background:var(--amber);color:#17130a;font-size:18px;font-weight:700}
+.go:disabled{opacity:.6}
+.go.small{min-height:48px;font-size:16px;border-radius:14px}
+.msg{margin:0;min-height:1.4em;color:var(--amber);font-weight:500}
+.fine{margin:0;color:var(--muted);font-size:14px}
+
+#app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:#000}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:38px;padding:7px 14px;border:1px solid var(--hair);border-radius:999px;background:transparent;color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#101114}
+#view{position:relative;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#frame{position:relative;width:100%;height:100%;background:#000;overflow:hidden}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000}
+#ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 0 1.5px rgba(0,0,0,.75))}
+#ov *{fill:none;stroke:rgba(244,241,234,.85);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+#ov [data-s="fix"],#ov [data-s="fix"] *{stroke:var(--amber)}
+#ov [data-s="ok"],#ov [data-s="ok"] *{stroke:var(--lock)}
+#ov .thin{stroke-width:1.5;stroke:rgba(244,241,234,.6);stroke-dasharray:5 6}
+#ov #hz-line{stroke-width:3}
+#ov text{fill:var(--ink);stroke:none;font:700 15px system-ui,sans-serif}
+#ov [data-s="fix"] text{fill:var(--amber);stroke:none}
+#ov [data-s="ok"] text{fill:var(--lock);stroke:none}
+#ov #bu-dot{fill:var(--amber);stroke:none}
+#ov [data-s="ok"] #bu-dot{fill:var(--lock);stroke:none}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.on{animation:flash .28s ease-out}
+@keyframes flash{from{opacity:.85}to{opacity:0}}
+.pill{position:absolute;left:50%;top:12px;transform:translateX(-50%);margin:0;width:max-content;max-width:calc(100% - 24px);padding:10px 18px;border-radius:999px;background:var(--amber);color:#17130a;font-size:18px;font-weight:700;line-height:1.2;text-align:center}
+.pill[data-tone="wait"]{background:rgba(28,30,35,.88);color:var(--ink)}
+.pill[data-tone="lock"]{background:var(--lock);color:#0c1f18}
+.readout{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:12px;padding:6px 13px;border-radius:999px;background:rgba(16,17,20,.66);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+.readout [data-s="ok"]{color:var(--lock)}
+.readout [data-s="fix"]{color:var(--amber)}
+.mini{position:absolute;bottom:8px;width:40px;height:40px;border:1px solid var(--hair);border-radius:50%;background:rgba(16,17,20,.66);font-size:14px;font-weight:700}
+.mini.left{left:8px}
+.mini.right{right:8px}
+.diag{position:absolute;left:8px;top:58px;margin:0;max-width:calc(100% - 16px);padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.74);color:var(--ink);font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}
+.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.thumb{justify-self:start;position:relative;width:56px;height:56px;padding:0;border:1px solid var(--hair);border-radius:14px;background:var(--panel) center/cover no-repeat}
+.thumb:disabled{opacity:.5}
+.thumb span{position:absolute;right:-6px;top:-6px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--ink);color:#101114;font-size:12px;font-weight:700;line-height:22px;text-align:center}
+.shutter{width:88px;height:88px;padding:0;border:0;border-radius:50%;background:transparent}
+.shutter svg{display:block;width:100%;height:100%}
+.shutter:active #ring-core{transform:scale(.92)}
+#ring-core{fill:var(--ink);transform-origin:42px 42px;transition:transform .08s}
+.shutter[data-s="ok"] #ring-core{fill:var(--lock)}
+.seg{fill:none;stroke:rgba(244,241,234,.28);stroke-width:5}
+.seg[data-s="ok"]{stroke:var(--lock)}
+.seg[data-s="fix"]{stroke:var(--amber)}
+#ring-prog{fill:none;stroke:#101114;stroke-width:4;stroke-linecap:round}
+.toggles{justify-self:end;display:flex;flex-direction:column;gap:8px}
+.toggle{min-width:96px;min-height:36px;padding:6px 12px;border:1px solid var(--hair);border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:600}
+.toggle[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+
+#review{position:fixed;inset:0;display:flex;flex-direction:column;background:#000}
+.rv-img{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.rv-img img{max-width:100%;max-height:100%;display:block}
+.rv-meta{margin:0;padding:8px 16px 0;color:var(--muted);font-size:13px;text-align:center}
+.rv-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:12px 12px calc(14px + env(safe-area-inset-bottom,0px))}
+.ghost{min-height:48px;padding:10px 16px;border:1px solid var(--hair);border-radius:14px;background:transparent;font-size:15px;font-weight:600}
+.ghost:disabled{opacity:.4}
+
+@media (orientation:landscape){
+  #app{grid-template-rows:none;grid-template-columns:auto minmax(0,1fr) auto}
+  .chips{flex-direction:column;overflow-x:visible;overflow-y:auto;padding:10px}
+  .bar{grid-template-columns:none;grid-template-rows:1fr auto 1fr;justify-items:center;padding:12px}
+  .thumb{justify-self:center;align-self:start}
+  .toggles{justify-self:center;align-self:end}
+}
+@media (prefers-reduced-motion:reduce){.flash.on{animation:none}}
+</style>
+</head>
+<body>
+
+<main id="boot" class="boot">
+  <h1>Lock-On <span>Camera</span></h1>
+  <p class="lede">Live guidance while you aim. It tells you what to fix, then shoots when angle and position are right.</p>
+  <ol class="how">
+    <li>Pick a shot type.</li>
+    <li>Follow the one instruction on screen.</li>
+    <li>Hold still when it says Locked.</li>
+  </ol>
+  <button type="button" class="go" id="start">Start camera</button>
+  <p class="msg" id="boot-msg" role="status"></p>
+  <p class="fine">Allow the camera when Chrome asks. The picture is analysed on your phone and is not uploaded. If the camera does not start, open this link in Chrome.</p>
+</main>
+
+<div id="app" hidden>
+  <nav class="chips" id="chips" aria-label="Shot type"></nav>
+  <div id="view">
+    <div id="frame">
+      <video id="video" playsinline muted autoplay></video>
+      <svg id="ov" aria-hidden="true">
+        <g id="ov-target">
+          <path id="br-0"></path><path id="br-1"></path><path id="br-2"></path><path id="br-3"></path>
+          <circle id="head-ring"></circle>
+        </g>
+        <rect id="ov-subject" class="thin" rx="10"></rect>
+        <g id="ov-ticks"><line id="tick-l"></line><line id="tick-r"></line></g>
+        <g id="ov-hz"><line id="hz-line"></line></g>
+        <circle id="ov-anchor" r="12"></circle>
+        <g id="ov-gauge"><line id="ga-track" class="thin"></line><line id="ga-target"></line><line id="ga-mark"></line><text id="ga-text"></text></g>
+        <g id="ov-bubble"><circle id="bu-ring"></circle><circle id="bu-dot" r="9"></circle></g>
+      </svg>
+      <div class="flash" id="flash"></div>
+      <p class="pill" id="pill" data-tone="wait" role="status" aria-live="polite">Starting</p>
+      <div class="readout" id="readout"><span id="ro-tilt">Tilt</span><span id="ro-level">Level</span><span id="ro-body" hidden></span></div>
+      <button type="button" class="mini left" id="btn-info" aria-label="Show details" aria-pressed="false">i</button>
+      <button type="button" class="mini right" id="btn-zoom" aria-label="Zoom" hidden>1x</button>
+      <pre class="diag" id="diag" hidden></pre>
+    </div>
+  </div>
+  <div class="bar">
+    <button type="button" class="thumb" id="btn-roll" aria-label="Open photos" disabled><span id="roll-count" hidden></span></button>
+    <button type="button" class="shutter" id="btn-shutter" aria-label="Take photo">
+      <svg viewBox="0 0 84 84" aria-hidden="true">
+        <g id="ring-segs"></g>
+        <circle id="ring-core" cx="42" cy="42" r="29"></circle>
+        <circle id="ring-prog" cx="42" cy="42" r="22" transform="rotate(-90 42 42)" stroke-dasharray="0 200"></circle>
+      </svg>
+    </button>
+    <div class="toggles">
+      <button type="button" class="toggle" id="btn-auto" aria-pressed="true">Auto on</button>
+      <button type="button" class="toggle" id="btn-voice" aria-pressed="false">Voice off</button>
+    </div>
+  </div>
+</div>
+
+<div id="review" hidden>
+  <div class="rv-img"><img id="rv-img" alt="Captured photo"></div>
+  <p class="rv-meta" id="rv-meta" role="status"></p>
+  <div class="rv-actions">
+    <button type="button" class="go small" id="rv-save">Save</button>
+    <button type="button" class="ghost" id="rv-share" hidden>Share</button>
+    <button type="button" class="ghost" id="rv-rotate">Rotate</button>
+    <button type="button" class="ghost" id="rv-prev">Older</button>
+    <button type="button" class="ghost" id="rv-next">Newer</button>
+    <button type="button" class="ghost" id="rv-delete">Delete</button>
+    <button type="button" class="ghost" id="rv-close">Back to camera</button>
+  </div>
+</div>
+
+<script id="logic">
+/* ===== Pure logic: no DOM, no browser APIs. Unit-tested in Node. ===== */
+const DEG = 180 / Math.PI;
+/* Assumed half field of view along the frame's long side at 1x (about 66 degrees in total, a typical phone main camera).
+   It only matters while the phone is tilted: with the phone upright the eye-level line is the middle of the frame for any lens. */
+const TAN_LONG_HALF = Math.tan(33 / DEG);
+
+const RECIPES = {
+  full: {
+    name: "Full body", person: true, zoom: 1,
+    tilt: { target: 0, tol: 3 }, level: { tol: 1.5 },
+    size: { metric: "body", min: 0.70, max: 0.88 },
+    height: { anchor: "hips", below: 0.05, above: 0.05, word: "waist" },
+    center: 0.10
+  },
+  portrait: {
+    name: "Portrait", person: true, zoom: 2,
+    tilt: { target: -4, tol: 7 }, level: { tol: 1.5 },
+    size: { metric: "head", min: 0.20, max: 0.32 },
+    height: { anchor: "eyes", below: 0.09, above: 0.05, word: "eye" },
+    center: 0.10
+  },
+  food: { name: "Food 45°", person: false, zoom: 1, tilt: { target: -45, tol: 5 }, level: { tol: 2 } },
+  flat: { name: "Top-down", person: false, zoom: 1, flat: { tol: 3 } },
+  landscape: { name: "Landscape", person: false, zoom: 1, tilt: { target: 0, tol: 4 }, level: { tol: 0.8 } }
+};
+const RECIPE_ORDER = ["full", "portrait", "food", "flat", "landscape"];
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/* World "up" in device axes (x to the right of the screen, y to its top, z out of the screen), from the
+   W3C Z-X'-Y'' angles: the third row of R = Rz(alpha) Rx(beta) Ry(gamma). Alpha drops out. */
+function upFromOrientation(betaDeg, gammaDeg) {
+  const b = betaDeg / DEG, g = gammaDeg / DEG;
+  return { x: -Math.cos(b) * Math.sin(g), y: Math.sin(b), z: Math.cos(b) * Math.cos(g) };
+}
+
+/* The same vector from accelerationIncludingGravity. The spec value is +9.8 on the axis that points up
+   (flat, screen up: z = +9.8). Some browsers report the opposite sign, hence flip. */
+function upFromAccel(ax, ay, az, flip) {
+  const n = Math.hypot(ax, ay, az);
+  if (!(n > 3)) return null;
+  const s = flip ? -1 : 1;
+  return { x: s * ax / n, y: s * ay / n, z: s * az / n };
+}
+
+/* pitch: where the rear camera points. 0 = level, + = up, - = down, -90 = straight down.
+   roll: phone rotated clockwise as seen by the person holding it; rollErr is the offset from the nearest
+   upright or sideways hold. Both are null when the phone is nearly flat, where level has no meaning. */
+function anglesFromUp(u) {
+  const pitch = Math.asin(clamp(-u.z, -1, 1)) * DEG;
+  let roll = null, rollErr = null;
+  if (Math.hypot(u.x, u.y) > 0.26) {
+    roll = Math.atan2(-u.x, u.y) * DEG;
+    rollErr = roll - Math.round(roll / 90) * 90;
+  }
+  return { pitch: pitch, roll: roll, rollErr: rollErr, flatErr: 90 + pitch, ux: u.x, uy: u.y };
+}
+
+function vHalfTan(vw, vh, zoom) {
+  const longSide = Math.max(vw, vh) || 1;
+  return TAN_LONG_HALF * ((vh || 1) / longSide) / (zoom || 1);
+}
+
+/* Where the camera's own eye level crosses the picture, as a fraction of frame height from the top.
+   Anything in the scene that sits on this line is at the same height as the phone. */
+function horizonY(pitchDeg, halfTan) {
+  return 0.5 + Math.tan(clamp(pitchDeg, -80, 80) / DEG) / (2 * halfTan);
+}
+
+/* MediaPipe pose landmarks (33 points, x and y as fractions of the frame) -> the few numbers the guide needs. */
+function poseMetrics(lm) {
+  if (!lm || lm.length < 33) return null;
+  const ok = (p) => !!p && (p.visibility === undefined || p.visibility > 0.5);
+  const shL = lm[11], shR = lm[12];
+  if (!ok(shL) || !ok(shR)) return null;
+  const shY = (shL.y + shR.y) / 2;
+  const m = { shX: (shL.x + shR.x) / 2, shY: shY, shW: Math.abs(shL.x - shR.x), noseX: null, headTop: null, headH: null, eyesY: null, hipX: null, hipY: null, feetY: null };
+  const nose = lm[0];
+  if (ok(nose) && shY - nose.y > 0.01) {
+    const d = shY - nose.y;                       /* nose to shoulder line */
+    m.noseX = nose.x;
+    m.headTop = nose.y - 0.85 * d;                /* crown sits about 0.85 of that distance above the nose */
+    m.headH = 1.3 * d;                            /* crown to chin */
+    m.eyesY = ok(lm[2]) && ok(lm[5]) ? (lm[2].y + lm[5].y) / 2 : nose.y - 0.2 * d;
+  }
+  if (ok(lm[23]) && ok(lm[24])) { m.hipX = (lm[23].x + lm[24].x) / 2; m.hipY = (lm[23].y + lm[24].y) / 2; }
+  let feet = null;
+  [27, 28, 29, 30, 31, 32].forEach((i) => { if (ok(lm[i])) feet = feet === null ? lm[i].y : Math.max(feet, lm[i].y); });
+  m.feetY = feet;
+  return m;
+}
+
+function lightCode(st, prev) {
+  if (!st) return prev || "ok";
+  if (st.mean < (prev === "dark" ? 50 : 38)) return "dark";
+  if (st.subj !== null && st.bg !== null && st.bg > 115 && st.subj / st.bg < (prev === "backlit" ? 0.62 : 0.5)) return "backlit";
+  return "ok";
+}
+
+function degText(v) { return Math.max(1, Math.round(Math.abs(v))) + "°"; }
+
+function positionCheck(r, m, memo) {
+  const miss = (kind, text) => { memo.sizeOk = false; memo.centerOk = false; return { ok: false, kind: kind, text: text }; };
+  let size, x;
+  if (r.size.metric === "body") {
+    if (m.headTop === null) return miss("pos-none", "Point the camera at the person");
+    if (m.hipY === null) return miss("pos-back", "Step back");
+    if (m.feetY === null || m.feetY > 0.985) return miss("pos-back", "Step back, feet are cut off");
+    if (m.headTop < 0.01) return miss("pos-back", "Step back, head is cut off");
+    size = m.feetY - m.headTop;
+    x = m.hipX;
+  } else {
+    if (m.headH === null) return miss("pos-none", "Point the camera at the face");
+    if (m.headTop < 0.01) return miss("pos-back", "Step back, head is cut off");
+    size = m.headH;
+    x = m.noseX;
+  }
+  const slack = memo.sizeOk ? 0.03 : 0;
+  const lo = r.size.min - slack, hi = r.size.max + slack;
+  memo.sizeOk = size >= lo && size <= hi;
+  if (size < lo) { memo.centerOk = false; return { ok: false, kind: "pos-closer", text: "Step closer" }; }
+  if (size > hi) { memo.centerOk = false; return { ok: false, kind: "pos-back", text: "Step back" }; }
+  const off = x - 0.5;
+  memo.centerOk = Math.abs(off) <= r.center * (memo.centerOk ? 1.4 : 1);
+  if (!memo.centerOk) return off < 0 ? { ok: false, kind: "pos-left", text: "Aim a little left" } : { ok: false, kind: "pos-right", text: "Aim a little right" };
+  return { ok: true, kind: "pos-ok", text: "" };
+}
+
+function heightCheck(r, m, sensor, halfTan, memo) {
+  const anchor = r.height.anchor === "hips" ? m.hipY : m.eyesY;
+  if (anchor === null || !sensor.ok) { memo.heightOk = false; return { state: "idle", kind: "h-wait", text: "", anchorY: anchor }; }
+  const err = anchor - horizonY(sensor.pitch, halfTan);   /* + : the anchor is below eye level, so the phone is too high */
+  const slack = memo.heightOk ? 0.025 : 0;
+  memo.heightOk = err <= r.height.below + slack && err >= -(r.height.above + slack);
+  if (memo.heightOk) return { state: "ok", kind: "h-ok", text: "", anchorY: anchor };
+  return err > 0
+    ? { state: "fix", kind: "h-lower", text: "Lower the phone to " + r.height.word + " level", anchorY: anchor }
+    : { state: "fix", kind: "h-raise", text: "Raise the phone to " + r.height.word + " level", anchorY: anchor };
+}
+
+function angleCheck(r, s, memo) {
+  if (!s.ok) { memo.tiltOk = memo.levelOk = memo.flatOk = false; return { state: "idle", kind: "sensor-off", text: "Motion sensor is off. Allow it in Chrome site settings", tiltOk: false, levelOk: false }; }
+  if (r.flat) {
+    memo.flatOk = s.flatErr <= r.flat.tol * (memo.flatOk ? 1.4 : 1);
+    if (memo.flatOk) return { state: "ok", kind: "flat-ok", text: "", tiltOk: true, levelOk: true };
+    if (s.flatErr > 40) return { state: "fix", kind: "flat-far", text: "Hold the phone flat above the subject", tiltOk: false, levelOk: true };
+    const text = Math.abs(s.uy) >= Math.abs(s.ux) ? (s.uy > 0 ? "Lower the top edge" : "Lower the bottom edge") : (s.ux > 0 ? "Lower the right edge" : "Lower the left edge");
+    return { state: "fix", kind: "flat-" + text.split(" ")[2], text: text, tiltOk: false, levelOk: true };
+  }
+  const tErr = s.pitch - r.tilt.target;
+  memo.tiltOk = Math.abs(tErr) <= r.tilt.tol * (memo.tiltOk ? 1.35 : 1);
+  if (!memo.tiltOk) {
+    memo.levelOk = false;
+    return tErr > 0
+      ? { state: "fix", kind: "tilt-down", text: "Tilt down " + degText(tErr), tiltOk: false, levelOk: false }
+      : { state: "fix", kind: "tilt-up", text: "Tilt up " + degText(tErr), tiltOk: false, levelOk: false };
+  }
+  if (s.rollErr === null) { memo.levelOk = false; return { state: "fix", kind: "upright", text: "Hold the phone upright", tiltOk: true, levelOk: false }; }
+  memo.levelOk = Math.abs(s.rollErr) <= r.level.tol * (memo.levelOk ? 1.4 : 1);
+  if (!memo.levelOk) {
+    return s.rollErr > 0
+      ? { state: "fix", kind: "rot-left", text: "Rotate left " + degText(s.rollErr), tiltOk: true, levelOk: false }
+      : { state: "fix", kind: "rot-right", text: "Rotate right " + degText(s.rollErr), tiltOk: true, levelOk: false };
+  }
+  return { state: "ok", kind: "angle-ok", text: "", tiltOk: true, levelOk: true };
+}
+
+/* One pass of the guide. Checks run biggest move first: light, position, height, angle.
+   The first check that needs fixing becomes the single instruction on screen. */
+function evaluate(inp, memo) {
+  const r = inp.recipe;
+  const checks = [];
+  const out = { checks: checks, step: null, allOk: false, locked: false, anchorY: null, tiltOk: false, levelOk: false };
+  const add = (key, state, kind, text) => { checks.push({ key: key, state: state, kind: kind, text: text }); };
+
+  if (inp.light === "dark") add("light", "fix", "light-dark", "Too dark. Find more light");
+  else if (inp.light === "backlit") add("light", "fix", "light-back", "Backlit. Keep the light behind you");
+  else add("light", "ok", "light-ok", "");
+
+  if (r.person && inp.pose.status !== "off") {
+    const m = inp.pose.m;
+    if (inp.pose.status !== "ready") {
+      add("position", "idle", "pos-loading", "Loading body detection");
+      add("height", "idle", "h-wait", "");
+    } else if (!m) {
+      memo.sizeOk = memo.centerOk = memo.heightOk = false;
+      add("position", "fix", "pos-none", r.size.metric === "body" ? "Point the camera at the person" : "Point the camera at the face");
+      add("height", "idle", "h-wait", "");
+    } else {
+      const p = positionCheck(r, m, memo);
+      add("position", p.ok ? "ok" : "fix", p.kind, p.text);
+      const h = heightCheck(r, m, inp.sensor, inp.halfTan, memo);
+      out.anchorY = h.anchorY;
+      add("height", h.state, h.kind, h.text);
+    }
+  }
+
+  const a = angleCheck(r, inp.sensor, memo);
+  out.tiltOk = a.tiltOk;
+  out.levelOk = a.levelOk;
+  add("angle", a.state, a.kind, a.text);
+
+  out.allOk = checks.every((c) => c.state === "ok");
+  const firstFix = checks.find((c) => c.state === "fix");
+  const firstIdle = checks.find((c) => c.state === "idle" && c.text);
+  if (firstFix) out.step = { key: firstFix.key, kind: firstFix.kind, text: firstFix.text, tone: "fix" };
+  else if (firstIdle) out.step = { key: firstIdle.key, kind: firstIdle.kind, text: firstIdle.text, tone: "wait" };
+  else if (!out.allOk) out.step = { key: "wait", kind: "wait", text: "Getting ready", tone: "wait" };
+  else if (!inp.sensor.steady) out.step = { key: "steady", kind: "steady", text: "Hold still", tone: "wait" };
+  else { out.locked = true; out.step = { key: "locked", kind: "locked", text: "Locked", tone: "lock" }; }
+  return out;
+}
+
+function shotName(recipeKey, date) {
+  const p = (n) => String(n).padStart(2, "0");
+  return "lockon-" + recipeKey + "-" + date.getFullYear() + p(date.getMonth() + 1) + p(date.getDate()) + "-" + p(date.getHours()) + p(date.getMinutes()) + p(date.getSeconds()) + ".jpg";
+}
+</script>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const HOLD_MS = 650;          /* how long everything must stay locked before the automatic shot */
+  const STEADY_RATE = 6;        /* degrees per second */
+  const MAX_SHOTS = 12;
+
+  const el = {
+    boot: $("boot"), start: $("start"), bootMsg: $("boot-msg"), app: $("app"), chips: $("chips"),
+    view: $("view"), frame: $("frame"), video: $("video"), ov: $("ov"), flash: $("flash"), pill: $("pill"),
+    roTilt: $("ro-tilt"), roLevel: $("ro-level"), roBody: $("ro-body"), info: $("btn-info"), zoom: $("btn-zoom"), diag: $("diag"),
+    roll: $("btn-roll"), rollCount: $("roll-count"), shutter: $("btn-shutter"), ringSegs: $("ring-segs"), ringProg: $("ring-prog"),
+    auto: $("btn-auto"), voice: $("btn-voice"),
+    target: $("ov-target"), br: [$("br-0"), $("br-1"), $("br-2"), $("br-3")], headRing: $("head-ring"), subject: $("ov-subject"),
+    ticks: $("ov-ticks"), tickL: $("tick-l"), tickR: $("tick-r"), hz: $("ov-hz"), hzLine: $("hz-line"), anchor: $("ov-anchor"),
+    gauge: $("ov-gauge"), gaTrack: $("ga-track"), gaTarget: $("ga-target"), gaMark: $("ga-mark"), gaText: $("ga-text"),
+    bubble: $("ov-bubble"), buRing: $("bu-ring"), buDot: $("bu-dot"),
+    review: $("review"), rvImg: $("rv-img"), rvMeta: $("rv-meta"), rvSave: $("rv-save"), rvShare: $("rv-share"), rvRotate: $("rv-rotate"),
+    rvPrev: $("rv-prev"), rvNext: $("rv-next"), rvDelete: $("rv-delete"), rvClose: $("rv-close")
+  };
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("lockon." + k); return v === null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("lockon." + k, v); } catch (e) { /* optional */ } }
+  };
+
+  const savedRecipe = store.get("recipe", "full");
+  const state = {
+    recipeKey: RECIPES[savedRecipe] ? savedRecipe : "full",
+    auto: store.get("auto", "1") === "1",
+    voice: store.get("voice", "0") === "1",
+    started: false, vw: 0, vh: 0, fw: 0, fh: 0, zoom: 1,
+    memo: {}, shown: { kind: "", text: "", tone: "" }, cand: { kind: "", since: 0 },
+    lockedSince: 0, unlockedSince: 0, armed: true, capturing: false, ringKeys: "",
+    shots: [], reviewIndex: -1, diag: false, lastSlow: 0, lastSpoken: 0, lastStep: null, lastEval: null
+  };
+  const cam = { stream: null, track: null, still: null, stillOk: true, zoomCaps: null, starting: false };
+  const sense = { up: null, source: "none", lastOri: 0, lastMotion: 0, lastT: 0, hist: [], rate: 99, lastUnsteady: 0, beta: null, gamma: null, accelFlip: /iPhone|iPad|iPod/.test(navigator.userAgent), flipVotes: 0 };
+  const pose = { status: "idle", landmarker: null, vision: null, fileset: null, model: "", last: 0, interval: 120, cost: 0, lm: null, stamp: 0, fails: 0, delegate: "", error: "" };
+  const light = { last: 0, code: "ok", stats: null, canvas: null, ctx: null };
+  const smooth = { v: null };
+  let wake = null;
+
+  const recipe = () => RECIPES[state.recipeKey];
+  const show = (node, on) => { node.style.display = on ? "" : "none"; };
+  const mark = (node, s) => { if (node.dataset.s !== s) node.dataset.s = s; };
+
+  /* ---------- motion sensor ---------- */
+  function pushUp(u, now) {
+    if (!sense.up) sense.up = { x: u.x, y: u.y, z: u.z };
+    else {
+      const dt = clamp((now - sense.lastT) / 1000, 0.001, 0.1);
+      const a = 1 - Math.exp(-dt / (sense.source === "motion" ? 0.25 : 0.09));
+      const x = sense.up.x + a * (u.x - sense.up.x), y = sense.up.y + a * (u.y - sense.up.y), z = sense.up.z + a * (u.z - sense.up.z);
+      const n = Math.hypot(x, y, z) || 1;
+      sense.up = { x: x / n, y: y / n, z: z / n };
+    }
+    sense.lastT = now;
+    sense.hist.push({ t: now, x: sense.up.x, y: sense.up.y, z: sense.up.z });
+    while (sense.hist.length > 2 && now - sense.hist[0].t > 260) sense.hist.shift();
+    const old = sense.hist[0];
+    const span = (now - old.t) / 1000;
+    if (span > 0.12) sense.rate = Math.acos(clamp(old.x * sense.up.x + old.y * sense.up.y + old.z * sense.up.z, -1, 1)) * DEG / span;
+    if (sense.rate > STEADY_RATE) sense.lastUnsteady = now;
+  }
+  function onOrientation(e) {
+    if (typeof e.beta !== "number" || typeof e.gamma !== "number") return;
+    const now = performance.now();
+    sense.lastOri = now;
+    sense.source = "orientation";
+    sense.beta = e.beta;
+    sense.gamma = e.gamma;
+    pushUp(upFromOrientation(e.beta, e.gamma), now);
+  }
+  function onMotion(e) {
+    const g = e.accelerationIncludingGravity;
+    if (!g || typeof g.x !== "number" || typeof g.y !== "number" || typeof g.z !== "number") return;
+    const now = performance.now();
+    const u = upFromAccel(g.x, g.y, g.z, sense.accelFlip);
+    if (!u) return;
+    sense.lastMotion = now;
+    if (now - sense.lastOri < 500 && sense.up) {
+      /* Orientation data is the better source. Use this moment to learn the accelerometer's sign for later. */
+      const d = u.x * sense.up.x + u.y * sense.up.y + u.z * sense.up.z;
+      sense.flipVotes = d < -0.5 ? sense.flipVotes + 1 : 0;
+      if (sense.flipVotes > 20) { sense.accelFlip = !sense.accelFlip; sense.flipVotes = 0; }
+      return;
+    }
+    sense.source = "motion";
+    pushUp(u, now);
+  }
+  async function askMotionPermission() {
+    try {
+      if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") await DeviceOrientationEvent.requestPermission();
+      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") await DeviceMotionEvent.requestPermission();
+    } catch (e) { /* the guide then reports that the sensor is off */ }
+  }
+
+  /* ---------- camera ---------- */
+  function stopStream() {
+    if (cam.stream) cam.stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { /* already stopped */ } });
+    cam.stream = null; cam.track = null; cam.still = null; cam.zoomCaps = null;
+  }
+  async function startCamera() {
+    if (cam.starting) return;
+    cam.starting = true;
+    try {
+      stopStream();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } } });
+      cam.stream = stream;
+      cam.track = stream.getVideoTracks()[0];
+      el.video.srcObject = stream;
+      try { await Promise.race([el.video.play(), new Promise((resolve) => setTimeout(resolve, 3000))]); } catch (e) { /* the autoplay attribute covers it */ }
+      let caps = null;
+      try { caps = cam.track.getCapabilities ? cam.track.getCapabilities() : null; } catch (e) { caps = null; }
+      const z = caps && caps.zoom;
+      cam.zoomCaps = z && typeof z.max === "number" && z.max >= 2 * (z.min || 1) ? { min: z.min || 1, max: z.max } : null;
+      state.zoom = 1;
+      cam.still = null;
+      if (cam.stillOk && "ImageCapture" in window) { try { cam.still = new ImageCapture(cam.track); } catch (e) { cam.still = null; } }
+      el.zoom.hidden = !cam.zoomCaps;
+      onVideoSize();
+      applyRecipeZoom();
+    } finally {
+      cam.starting = false;
+    }
+  }
+  async function setZoom(factor) {
+    if (!cam.zoomCaps || !cam.track) return;
+    const f = clamp(factor, 1, cam.zoomCaps.max / cam.zoomCaps.min);
+    try {
+      await cam.track.applyConstraints({ advanced: [{ zoom: cam.zoomCaps.min * f }] });
+      state.zoom = f;
+    } catch (e) { /* keep the current zoom */ }
+    el.zoom.textContent = (Math.round(state.zoom * 10) / 10) + "x";
+  }
+  function applyRecipeZoom() {
+    if (cam.zoomCaps) setZoom(recipe().zoom || 1);
+    else { state.zoom = 1; el.zoom.textContent = "1x"; }
+  }
+  function onVideoSize() {
+    const vw = el.video.videoWidth, vh = el.video.videoHeight;
+    if (!vw || !vh) return;
+    state.vw = vw; state.vh = vh;
+    layout();
+  }
+  function startErrorText(e) {
+    const name = (e && e.name) || "";
+    if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") return "Camera access is blocked. Tap the icon left of the address in Chrome, allow Camera, then reload this page.";
+    if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "No camera was found on this device.";
+    if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") return "The camera is busy in another app. Close that app, then try again.";
+    if (name === "Unsupported") return "This browser cannot open the camera here. Open this link in Chrome.";
+    return "The camera did not start" + (name ? " (" + name + ")" : "") + ". Reload the page and try again.";
+  }
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) { wake = null; }
+  }
+
+  /* ---------- layout and static overlay geometry ---------- */
+  function setLine(node, x1, y1, x2, y2) {
+    node.setAttribute("x1", x1.toFixed(1)); node.setAttribute("y1", y1.toFixed(1));
+    node.setAttribute("x2", x2.toFixed(1)); node.setAttribute("y2", y2.toFixed(1));
+  }
+  function layout() {
+    const W = el.view.clientWidth, H = el.view.clientHeight;
+    if (!W || !H || !state.vw) return;
+    const ar = state.vw / state.vh;
+    let fw = W, fh = W / ar;
+    if (fh > H) { fh = H; fw = H * ar; }
+    state.fw = Math.round(fw); state.fh = Math.round(fh);
+    el.frame.style.width = state.fw + "px";
+    el.frame.style.height = state.fh + "px";
+    el.ov.setAttribute("viewBox", "0 0 " + state.fw + " " + state.fh);
+    drawStatic();
+  }
+  function drawStatic() {
+    const fw = state.fw, fh = state.fh;
+    if (!fw) return;
+    const key = state.recipeKey;
+    const c = Math.min(fw, fh) * 0.07;
+    if (key === "full") {
+      const x0 = fw * 0.27, x1 = fw * 0.73, y0 = fh * 0.12, y1 = fh * 0.92;
+      el.br[0].setAttribute("d", "M" + x0 + " " + (y0 + c) + "V" + y0 + "H" + (x0 + c));
+      el.br[1].setAttribute("d", "M" + (x1 - c) + " " + y0 + "H" + x1 + "V" + (y0 + c));
+      el.br[2].setAttribute("d", "M" + x0 + " " + (y1 - c) + "V" + y1 + "H" + (x0 + c));
+      el.br[3].setAttribute("d", "M" + (x1 - c) + " " + y1 + "H" + x1 + "V" + (y1 - c));
+    }
+    el.br.forEach((p) => show(p, key === "full"));
+    show(el.headRing, key === "portrait");
+    el.headRing.setAttribute("cx", (fw / 2).toFixed(1));
+    el.headRing.setAttribute("cy", (fh * 0.4).toFixed(1));
+    el.headRing.setAttribute("r", (fh * 0.13).toFixed(1));
+    setLine(el.hzLine, -fw * 0.42, 0, fw * 0.42, 0);
+    const gx = fw - 26, cy = fh / 2;
+    setLine(el.gaTrack, gx, cy - 100, gx, cy + 100);
+    setLine(el.gaTarget, gx - 12, cy, gx + 12, cy);
+    el.buRing.setAttribute("cx", (fw / 2).toFixed(1));
+    el.buRing.setAttribute("cy", (fh / 2).toFixed(1));
+    el.buRing.setAttribute("r", (Math.min(fw, fh) * 0.15).toFixed(1));
+  }
+
+  /* ---------- recipes and controls ---------- */
+  function buildChips() {
+    el.chips.textContent = "";
+    RECIPE_ORDER.forEach((key) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = RECIPES[key].name;
+      b.dataset.key = key;
+      b.setAttribute("aria-pressed", key === state.recipeKey ? "true" : "false");
+      b.addEventListener("click", () => setRecipe(key));
+      el.chips.appendChild(b);
+    });
+  }
+  function setRecipe(key) {
+    if (!RECIPES[key]) return;
+    state.recipeKey = key;
+    store.set("recipe", key);
+    state.memo = {};
+    smooth.v = null;
+    state.lockedSince = 0;
+    state.armed = true;
+    Array.from(el.chips.children).forEach((b) => b.setAttribute("aria-pressed", b.dataset.key === key ? "true" : "false"));
+    drawStatic();
+    if (state.started) applyRecipeZoom();
+  }
+  function buildRing(keys) {
+    el.ringSegs.textContent = "";
+    const n = keys.length, R = 38, C = 2 * Math.PI * R, gap = n > 1 ? 8 : 0, len = C / n - gap;
+    keys.forEach((k, i) => {
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("class", "seg");
+      c.setAttribute("cx", "42"); c.setAttribute("cy", "42"); c.setAttribute("r", String(R));
+      c.setAttribute("stroke-dasharray", len.toFixed(2) + " " + (C - len).toFixed(2));
+      c.setAttribute("transform", "rotate(" + (-90 + (360 / n) * i + (gap / 2 / C) * 360).toFixed(2) + " 42 42)");
+      el.ringSegs.appendChild(c);
+    });
+  }
+  function syncToggles() {
+    el.auto.setAttribute("aria-pressed", state.auto ? "true" : "false");
+    el.auto.textContent = state.auto ? "Auto on" : "Auto off";
+    el.voice.setAttribute("aria-pressed", state.voice ? "true" : "false");
+    el.voice.textContent = state.voice ? "Voice on" : "Voice off";
+  }
+  function buzz(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* no vibration */ }
+  }
+  function speak(text, now) {
+    if (!state.voice || !("speechSynthesis" in window) || !text) return;
+    if (now - state.lastSpoken < 1800) return;
+    state.lastSpoken = now;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace("°", " degrees"));
+      u.lang = "en-US";
+      u.rate = 1.05;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* no speech */ }
+  }
+
+  /* ---------- body detection ---------- */
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Could not load " + src));
+      document.head.appendChild(s);
+    });
+  }
+  function makeLandmarker(delegate) {
+    return pose.vision.PoseLandmarker.createFromOptions(pose.fileset, {
+      baseOptions: { modelAssetPath: pose.model, delegate: delegate },
+      runningMode: "VIDEO",
+      numPoses: 1
+    });
+  }
+  async function loadPose() {
+    if (pose.status !== "idle") return;
+    pose.status = "loading";
+    try {
+      await loadScript("vendor/tasks-vision/vision_bundle.js");
+      pose.vision = window.Vision;
+      if (!pose.vision || !pose.vision.PoseLandmarker) throw new Error("Body detection library missing");
+      pose.model = new URL("models/pose_landmarker_full.task", document.baseURI).href;
+      pose.fileset = await pose.vision.FilesetResolver.forVisionTasks(new URL("vendor/tasks-vision/wasm", document.baseURI).href);
+      try { pose.landmarker = await makeLandmarker("GPU"); pose.delegate = "GPU"; }
+      catch (e) { pose.landmarker = await makeLandmarker("CPU"); pose.delegate = "CPU"; }
+      pose.status = "ready";
+    } catch (e) {
+      pose.status = "off";
+      pose.error = String((e && e.message) || e);
+    }
+  }
+  async function poseToCpu() {
+    pose.status = "loading";
+    try {
+      try { if (pose.landmarker && pose.landmarker.close) pose.landmarker.close(); } catch (e) { /* already closed */ }
+      pose.landmarker = await makeLandmarker("CPU");
+      pose.delegate = "CPU";
+      pose.fails = 0;
+      pose.status = "ready";
+    } catch (e) {
+      pose.status = "off";
+      pose.error = String((e && e.message) || e);
+    }
+  }
+  function runPose(now) {
+    if (pose.status !== "ready" || el.video.readyState < 2 || !state.vw) return;
+    if (now - pose.last < pose.interval) return;
+    pose.last = now;
+    const t0 = performance.now();
+    try {
+      const res = pose.landmarker.detectForVideo(el.video, now);
+      pose.lm = res && res.landmarks && res.landmarks[0] ? res.landmarks[0] : null;
+      pose.stamp = now;
+      pose.fails = 0;
+    } catch (e) {
+      pose.fails += 1;
+      pose.error = String((e && e.message) || e);
+      if (pose.fails >= 3) {
+        if (pose.delegate === "GPU") poseToCpu();
+        else pose.status = "off";
+      }
+    }
+    const cost = performance.now() - t0;
+    pose.cost = pose.cost ? pose.cost * 0.8 + cost * 0.2 : cost;
+    pose.interval = clamp(pose.cost * 3, 100, 600);
+  }
+  const SMOOTH_KEYS = ["shX", "shY", "shW", "noseX", "headTop", "headH", "eyesY", "hipX", "hipY", "feetY"];
+  function smoothMetrics(m) {
+    if (!m) { smooth.v = null; return null; }
+    if (!smooth.v) { smooth.v = Object.assign({}, m); return smooth.v; }
+    SMOOTH_KEYS.forEach((k) => {
+      const a = m[k], b = smooth.v[k];
+      smooth.v[k] = a === null || b === null || b === undefined ? a : b + 0.45 * (a - b);
+    });
+    return smooth.v;
+  }
+
+  /* ---------- light ---------- */
+  function sampleLight() {
+    try {
+      if (!light.canvas) {
+        light.canvas = document.createElement("canvas");
+        light.canvas.width = 32; light.canvas.height = 32;
+        light.ctx = light.canvas.getContext("2d", { willReadFrequently: true });
+      }
+      light.ctx.drawImage(el.video, 0, 0, 32, 32);
+      const d = light.ctx.getImageData(0, 0, 32, 32).data;
+      let all = 0;
+      for (let i = 0; i < d.length; i += 4) all += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      /* Only overall brightness is used. Judging backlight from brightness alone misfires on dark clothing
+         and darker skin against a bright wall, so that check stays out of the live guide for now. */
+      light.stats = { mean: all / 1024, subj: null, bg: null };
+      light.code = lightCode(light.stats, light.code);
+    } catch (e) {
+      light.stats = null;
+      light.code = "ok";
+    }
+  }
+
+  /* ---------- capture and photos ---------- */
+  function grabFrame() {
+    return new Promise((resolve) => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = state.vw; c.height = state.vh;
+        c.getContext("2d").drawImage(el.video, 0, 0, state.vw, state.vh);
+        c.toBlob((b) => resolve(b), "image/jpeg", 0.93);
+      } catch (e) { resolve(null); }
+    });
+  }
+  function takeStill() {
+    if (!cam.still || !cam.stillOk) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (b) => { if (!done) { done = true; resolve(b); } };
+      const timer = setTimeout(() => { cam.stillOk = false; finish(null); }, 6000);
+      cam.still.takePhoto().then((b) => { clearTimeout(timer); finish(b && b.size ? b : null); }, () => { clearTimeout(timer); cam.stillOk = false; finish(null); });
+    });
+  }
+  async function capture(how) {
+    if (state.capturing || !state.vw) return;
+    state.capturing = true;
+    el.flash.classList.remove("on");
+    void el.flash.offsetWidth;
+    el.flash.classList.add("on");
+    buzz(how === "auto" ? [18, 40, 18] : 18);
+    try {
+      const frameBlob = await grabFrame();          /* the exact moment, always available */
+      let blob = await takeStill();                 /* the camera's full-quality still, when the phone offers it */
+      let quality = "full quality";
+      if (!blob) { blob = frameBlob; quality = "preview quality"; }
+      if (blob) addShot(blob, quality);
+    } finally {
+      state.capturing = false;
+    }
+  }
+  function addShot(blob, quality) {
+    const shot = { blob: blob, url: URL.createObjectURL(blob), name: shotName(state.recipeKey, new Date()), quality: quality };
+    state.shots.push(shot);
+    while (state.shots.length > MAX_SHOTS) URL.revokeObjectURL(state.shots.shift().url);
+    syncRoll();
+  }
+  function syncRoll() {
+    const n = state.shots.length;
+    el.roll.disabled = n === 0;
+    el.roll.style.backgroundImage = n ? "url(" + state.shots[n - 1].url + ")" : "";
+    el.rollCount.hidden = n === 0;
+    el.rollCount.textContent = String(n);
+  }
+  function openReview(i) {
+    if (!state.shots.length) { closeReview(); return; }
+    state.reviewIndex = clamp(i, 0, state.shots.length - 1);
+    const s = state.shots[state.reviewIndex];
+    el.rvImg.src = s.url;
+    el.rvMeta.textContent = "Photo " + (state.reviewIndex + 1) + " of " + state.shots.length + ", " + s.quality + ". Photos stay here until you save them.";
+    el.rvPrev.disabled = state.reviewIndex === 0;
+    el.rvNext.disabled = state.reviewIndex === state.shots.length - 1;
+    let canShare = false;
+    try { canShare = !!navigator.canShare && navigator.canShare({ files: [new File([s.blob], s.name, { type: "image/jpeg" })] }); } catch (e) { canShare = false; }
+    el.rvShare.hidden = !canShare;
+    el.review.hidden = false;
+  }
+  function closeReview() {
+    el.review.hidden = true;
+    state.reviewIndex = -1;
+    el.rvImg.removeAttribute("src");
+  }
+  function saveShot() {
+    const s = state.shots[state.reviewIndex];
+    if (!s) return;
+    const a = document.createElement("a");
+    a.href = s.url;
+    a.download = s.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    el.rvMeta.textContent = "Saved to your Downloads folder as " + s.name;
+  }
+  async function shareShot() {
+    const s = state.shots[state.reviewIndex];
+    if (!s) return;
+    try { await navigator.share({ files: [new File([s.blob], s.name, { type: "image/jpeg" })] }); } catch (e) { /* cancelled */ }
+  }
+  function rotateShot() {
+    const s = state.shots[state.reviewIndex];
+    if (!s) return;
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalHeight; c.height = img.naturalWidth;
+      const ctx = c.getContext("2d");
+      ctx.translate(c.width, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, 0, 0);
+      c.toBlob((b) => {
+        if (!b) return;
+        URL.revokeObjectURL(s.url);
+        s.blob = b;
+        s.url = URL.createObjectURL(b);
+        syncRoll();
+        if (state.shots[state.reviewIndex] === s) openReview(state.reviewIndex);
+      }, "image/jpeg", 0.93);
+    };
+    img.src = s.url;
+  }
+  function deleteShot() {
+    const i = state.reviewIndex;
+    if (i < 0 || !state.shots[i]) return;
+    URL.revokeObjectURL(state.shots[i].url);
+    state.shots.splice(i, 1);
+    syncRoll();
+    if (state.shots.length) openReview(Math.min(i, state.shots.length - 1));
+    else closeReview();
+  }
+
+  /* ---------- the live loop ---------- */
+  function showStep(step, now) {
+    if (step.kind !== state.cand.kind) state.cand = { kind: step.kind, since: now };
+    const same = step.kind === state.shown.kind;
+    const due = step.kind === "locked" || state.shown.kind === "" || now - state.cand.since >= 220;
+    if (!same && !due) return;
+    if (!same) {
+      state.shown.kind = step.kind;
+      if (step.kind === "locked") buzz(22);
+      speak(step.text, now);
+    }
+    if (state.shown.text !== step.text) { state.shown.text = step.text; el.pill.textContent = step.text; }
+    if (state.shown.tone !== step.tone) { state.shown.tone = step.tone; el.pill.dataset.tone = step.tone; }
+  }
+
+  function drawOverlay(g, ang, m, halfTan) {
+    const fw = state.fw, fh = state.fh, r = recipe();
+    if (!fw) return;
+    const st = {};
+    g.checks.forEach((c) => { st[c.key] = c.state; });
+    const stepKey = g.step.key;
+    const personOn = r.person && pose.status !== "off";
+
+    show(el.target, personOn);
+    if (personOn) mark(el.target, st.position === "ok" ? "ok" : stepKey === "position" ? "fix" : "");
+
+    let box = null;
+    if (personOn && m && m.headTop !== null) {
+      if (r.size.metric === "body") {
+        const half = Math.max(0.08, m.shW * 0.9);
+        const cx = m.hipX !== null ? m.hipX : m.shX;
+        box = { x0: cx - half, x1: cx + half, y0: m.headTop, y1: m.feetY !== null ? m.feetY : (m.hipY !== null ? m.hipY : m.shY) };
+      } else {
+        const half = Math.max(0.06, m.shW * 0.36);
+        box = { x0: m.noseX - half, x1: m.noseX + half, y0: m.headTop, y1: m.headTop + m.headH };
+      }
+    }
+    show(el.subject, !!box);
+    if (box) {
+      const x0 = clamp(box.x0, 0, 1) * fw, x1 = clamp(box.x1, 0, 1) * fw, y0 = clamp(box.y0, 0, 1) * fh, y1 = clamp(box.y1, 0, 1) * fh;
+      el.subject.setAttribute("x", x0.toFixed(1)); el.subject.setAttribute("y", y0.toFixed(1));
+      el.subject.setAttribute("width", Math.max(2, x1 - x0).toFixed(1)); el.subject.setAttribute("height", Math.max(2, y1 - y0).toFixed(1));
+    }
+
+    const hasTilt = !!r.tilt && !!ang;
+    const nearLevel = hasTilt && Math.abs(r.tilt.target) <= 10;
+    show(el.hz, hasTilt);
+    if (hasTilt) {
+      const y = nearLevel ? clamp(horizonY(ang.pitch, halfTan), 0.03, 0.97) * fh : fh / 2;
+      const rot = ang.rollErr === null ? 0 : -ang.rollErr;
+      el.hz.setAttribute("transform", "translate(" + (fw / 2).toFixed(1) + " " + y.toFixed(1) + ") rotate(" + rot.toFixed(2) + ")");
+      const heightDone = st.height === undefined || st.height === "ok";
+      const lineOk = nearLevel ? st.angle === "ok" && heightDone : g.levelOk;
+      mark(el.hz, lineOk ? "ok" : (stepKey === "angle" || stepKey === "height") ? "fix" : "");
+    }
+    const ticksOn = nearLevel && (g.step.kind === "tilt-up" || g.step.kind === "tilt-down");
+    show(el.ticks, ticksOn);
+    if (ticksOn) {
+      const ty = clamp(horizonY(r.tilt.target, halfTan), 0.03, 0.97) * fh;
+      setLine(el.tickL, 0, ty, 22, ty);
+      setLine(el.tickR, fw - 22, ty, fw, ty);
+      mark(el.ticks, "fix");
+    }
+
+    const anchorOn = personOn && !!m && g.anchorY !== null && (stepKey === "height" || st.height === "ok");
+    show(el.anchor, anchorOn);
+    if (anchorOn) {
+      const ax = r.height.anchor === "hips" ? m.hipX : m.noseX;
+      el.anchor.setAttribute("cx", (clamp(ax === null ? 0.5 : ax, 0, 1) * fw).toFixed(1));
+      el.anchor.setAttribute("cy", (clamp(g.anchorY, 0, 1) * fh).toFixed(1));
+      mark(el.anchor, st.height === "ok" ? "ok" : "fix");
+    }
+
+    const gaugeOn = hasTilt && !nearLevel;
+    show(el.gauge, gaugeOn);
+    if (gaugeOn) {
+      const gx = fw - 26, cy = fh / 2;
+      const my = cy - clamp(ang.pitch - r.tilt.target, -25, 25) * 4;
+      setLine(el.gaMark, gx - 18, my, gx + 18, my);
+      el.gaText.setAttribute("x", (gx - 62).toFixed(1));
+      el.gaText.setAttribute("y", (my + 5).toFixed(1));
+      el.gaText.textContent = Math.round(-ang.pitch) + "°";
+      mark(el.gauge, g.tiltOk ? "ok" : "fix");
+    }
+
+    const bubbleOn = !!r.flat && !!ang;
+    show(el.bubble, bubbleOn);
+    if (bubbleOn) {
+      const R = Math.min(fw, fh) * 0.15, k = R / Math.sin(12 / DEG);
+      el.buDot.setAttribute("cx", (fw / 2 + clamp(ang.ux * k, -1.8 * R, 1.8 * R)).toFixed(1));
+      el.buDot.setAttribute("cy", (fh / 2 + clamp(-ang.uy * k, -1.8 * R, 1.8 * R)).toFixed(1));
+      mark(el.bubble, st.angle === "ok" ? "ok" : "fix");
+    }
+  }
+
+  function slowUi(g, ang, now) {
+    const r = recipe();
+    if (ang) {
+      if (r.flat) {
+        el.roTilt.textContent = "Off flat " + Math.round(ang.flatErr) + "°";
+        el.roLevel.hidden = true;
+      } else {
+        el.roTilt.textContent = "Tilt " + Math.round(ang.pitch) + "°";
+        el.roLevel.hidden = false;
+        el.roLevel.textContent = "Level " + (ang.rollErr === null ? "–" : (Math.round(ang.rollErr * 10) / 10).toFixed(1) + "°");
+      }
+      mark(el.roTilt, g.tiltOk ? "ok" : "fix");
+      mark(el.roLevel, g.levelOk ? "ok" : "fix");
+    } else {
+      el.roTilt.textContent = "No motion sensor";
+      el.roLevel.hidden = true;
+      mark(el.roTilt, "fix");
+    }
+    el.roBody.hidden = !r.person;
+    if (r.person) {
+      el.roBody.textContent = pose.status === "ready" ? "Body on" : pose.status === "off" ? "Body off" : "Body loading";
+      mark(el.roBody, pose.status === "ready" ? "ok" : pose.status === "off" ? "fix" : "");
+    }
+    if (state.diag) {
+      const f = (v, n) => (typeof v === "number" ? v.toFixed(n === undefined ? 1 : n) : "-");
+      const ts = cam.track && cam.track.getSettings ? cam.track.getSettings() : {};
+      el.diag.textContent = [
+        "video " + state.vw + "x" + state.vh + " frame " + state.fw + "x" + state.fh + " zoom " + f(state.zoom) + (cam.zoomCaps ? " (max " + f(cam.zoomCaps.max / cam.zoomCaps.min) + ")" : " (fixed)"),
+        "camera " + (ts.facingMode || "?") + " still " + (cam.still && cam.stillOk ? "yes" : "no") + " screen " + (window.screen && screen.orientation ? screen.orientation.angle : "?"),
+        "sensor " + sense.source + " beta " + f(sense.beta) + " gamma " + f(sense.gamma) + " rate " + f(sense.rate),
+        "pitch " + (ang ? f(ang.pitch) : "-") + " roll " + (ang && ang.roll !== null ? f(ang.roll) : "-") + " rollErr " + (ang && ang.rollErr !== null ? f(ang.rollErr, 2) : "-"),
+        "body " + pose.status + " " + pose.delegate + " " + f(pose.cost, 0) + "ms every " + f(pose.interval, 0) + "ms" + (pose.error ? " err " + pose.error.slice(0, 60) : ""),
+        "light " + light.code + (light.stats ? " mean " + f(light.stats.mean, 0) : ""),
+        "step " + g.step.kind + " | " + g.checks.map((c) => c.key + ":" + c.state).join(" ")
+      ].join("\n");
+    }
+  }
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!state.started || document.hidden || !el.review.hidden) return;
+    const r = recipe();
+    const sensorOk = !!sense.up && now - Math.max(sense.lastOri, sense.lastMotion) < 1200;
+    const ang = sensorOk ? anglesFromUp(sense.up) : null;
+    const steady = sensorOk && now - sense.lastUnsteady > 350;
+
+    let m = null;
+    if (r.person) {
+      if (pose.status === "idle") loadPose();
+      runPose(now);
+      const fresh = pose.status === "ready" && pose.lm && now - pose.stamp < 1200 ? pose.lm : null;
+      m = smoothMetrics(fresh ? poseMetrics(fresh) : null);
+    } else {
+      smooth.v = null;
+    }
+    if (now - light.last > 450 && el.video.readyState >= 2) { light.last = now; sampleLight(); }
+
+    const halfTan = vHalfTan(state.vw, state.vh, state.zoom);
+    const g = evaluate({
+      recipe: r,
+      sensor: { ok: sensorOk, steady: steady, pitch: ang ? ang.pitch : 0, rollErr: ang ? ang.rollErr : null, flatErr: ang ? ang.flatErr : 90, ux: ang ? ang.ux : 0, uy: ang ? ang.uy : 0 },
+      pose: { status: !r.person ? "off" : pose.status === "ready" ? "ready" : pose.status === "off" ? "off" : "loading", m: m },
+      light: light.code,
+      halfTan: halfTan
+    }, state.memo);
+    state.lastEval = g;
+
+    const keys = g.checks.map((c) => c.key).join(",");
+    if (keys !== state.ringKeys) { state.ringKeys = keys; buildRing(g.checks); }
+    g.checks.forEach((c, i) => { const seg = el.ringSegs.children[i]; if (seg) mark(seg, c.state === "ok" ? "ok" : c.state === "fix" ? "fix" : ""); });
+    mark(el.shutter, g.allOk ? "ok" : "");
+
+    let step = g.step;
+    let progress = 0;
+    if (g.locked) {
+      if (!state.lockedSince) state.lockedSince = now;
+      progress = clamp((now - state.lockedSince) / HOLD_MS, 0, 1);
+      if (state.auto) {
+        if (!state.armed) { step = { key: "locked", kind: "taken", text: "Shot taken. Move to reframe", tone: "lock" }; progress = 0; }
+        else if (progress >= 1 && !state.capturing) { state.armed = false; capture("auto"); }
+      } else {
+        step = { key: "locked", kind: "locked-manual", text: "Locked. Tap the button", tone: "lock" };
+        progress = 0;
+      }
+    } else {
+      state.lockedSince = 0;
+    }
+    if (g.allOk) state.unlockedSince = 0;
+    else {
+      if (!state.unlockedSince) state.unlockedSince = now;
+      if (now - state.unlockedSince > 500) state.armed = true;
+    }
+    if (state.capturing) step = { key: "locked", kind: "saving", text: "Hold still", tone: "lock" };
+    el.ringProg.style.display = progress > 0 ? "" : "none";
+    el.ringProg.setAttribute("stroke-dasharray", (progress * 138.2).toFixed(1) + " 200");
+
+    showStep(step, now);
+    drawOverlay(g, ang, m, halfTan);
+    if (now - state.lastSlow > 110) { state.lastSlow = now; slowUi(g, ang, now); }
+  }
+
+  /* ---------- wiring ---------- */
+  el.start.addEventListener("click", async () => {
+    el.start.disabled = true;
+    el.bootMsg.textContent = "Starting the camera";
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error("unsupported"), { name: "Unsupported" });
+      await askMotionPermission();
+      el.app.hidden = false;
+      await startCamera();
+      window.addEventListener("deviceorientation", onOrientation, true);
+      window.addEventListener("devicemotion", onMotion, true);
+      el.boot.hidden = true;
+      state.started = true;
+      layout();
+      keepAwake();
+      requestAnimationFrame(loop);
+    } catch (e) {
+      stopStream();
+      el.app.hidden = true;
+      el.boot.hidden = false;
+      el.start.disabled = false;
+      el.bootMsg.textContent = startErrorText(e);
+    }
+  });
+  el.video.addEventListener("loadedmetadata", onVideoSize);
+  el.video.addEventListener("resize", onVideoSize);
+  window.addEventListener("resize", layout);
+  if ("ResizeObserver" in window) new ResizeObserver(layout).observe(el.view);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !state.started) return;
+    keepAwake();
+    if (!cam.track || cam.track.readyState !== "live") startCamera().catch(() => { el.pill.textContent = "Camera stopped. Reload the page"; });
+  });
+  el.shutter.addEventListener("click", () => capture("manual"));
+  el.auto.addEventListener("click", () => { state.auto = !state.auto; store.set("auto", state.auto ? "1" : "0"); state.armed = true; syncToggles(); });
+  el.voice.addEventListener("click", () => {
+    state.voice = !state.voice;
+    store.set("voice", state.voice ? "1" : "0");
+    syncToggles();
+    if (state.voice) { state.lastSpoken = 0; speak("Voice on", performance.now()); }
+    else { try { window.speechSynthesis.cancel(); } catch (e) { /* no speech */ } }
+  });
+  el.info.addEventListener("click", () => { state.diag = !state.diag; el.diag.hidden = !state.diag; el.info.setAttribute("aria-pressed", state.diag ? "true" : "false"); });
+  el.zoom.addEventListener("click", () => { if (cam.zoomCaps) setZoom(state.zoom >= 1.9 ? 1 : 2); });
+  el.roll.addEventListener("click", () => openReview(state.shots.length - 1));
+  el.rvSave.addEventListener("click", saveShot);
+  el.rvShare.addEventListener("click", shareShot);
+  el.rvRotate.addEventListener("click", rotateShot);
+  el.rvPrev.addEventListener("click", () => openReview(state.reviewIndex - 1));
+  el.rvNext.addEventListener("click", () => openReview(state.reviewIndex + 1));
+  el.rvDelete.addEventListener("click", deleteShot);
+  el.rvClose.addEventListener("click", closeReview);
+
+  buildChips();
+  syncToggles();
+})();
+</script>
+</body>
+</html>
